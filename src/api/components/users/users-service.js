@@ -5,8 +5,12 @@ const { hashPassword, passwordMatched } = require('../../../utils/password');
  * Get list of users
  * @returns {Array}
  */
-async function getUsers({ page_number, page_size, sort, search }) {
+async function getUsers({ page_number = 1, page_size = 0, sort, search }) {
+  page_number = parseInt(page_number) || 1;
+  page_size = parseInt(page_size) || 0;
+
   let users = await usersRepository.getUsers();
+
   if (search) {
     const [field, searchKey] = search.split(':');
     if (field && (field === 'email' || field === 'name') && searchKey) {
@@ -14,8 +18,10 @@ async function getUsers({ page_number, page_size, sort, search }) {
       users = users.filter((user) => regex.test(user[field]));
     }
   }
+
   let sortField = 'email';
   let sortOrder = 1;
+
   if (sort) {
     const [field, order] = sort.split(':');
     if (field && (field === 'email' || field === 'name')) {
@@ -25,23 +31,24 @@ async function getUsers({ page_number, page_size, sort, search }) {
       sortOrder = -1;
     }
   }
+
   users.sort((a, b) => {
-    if (a[sortField] < b[sortField]) return -1 * sortOrder;
-    if (a[sortField] > b[sortField]) return 1 * sortOrder;
-    return 0;
+    const compareValue = a[sortField].localeCompare(b[sortField]);
+    return compareValue * sortOrder;
   });
 
-  let count = users.length;
-  let total_pages = Math.ceil(count / page_size);
-  page_number = parseInt(page_number) || 1;
-  page_size = parseInt(page_size) || count;
+  const count = users.length;
+  if (!page_size || page_size <= 0) {
+    page_size = count;
+  }
+  const total_pages = Math.ceil(count / page_size);
+
   const startIndex = (page_number - 1) * page_size;
   const endIndex = startIndex + page_size;
   const paginatedUsers = users.slice(startIndex, endIndex);
   const has_previous_page = page_number > 1;
   const has_next_page = page_number < total_pages;
-
-  return (response = {
+  return {
     page_number,
     page_size,
     count,
@@ -53,8 +60,9 @@ async function getUsers({ page_number, page_size, sort, search }) {
       name: user.name,
       email: user.email,
     })),
-  });
+  };
 }
+
 /**
  * Get user detail
  * @param {string} id - User ID
